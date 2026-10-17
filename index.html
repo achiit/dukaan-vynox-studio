@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vynox Studio</title>
+<style>
+:root{--bg:#fff;--card:#f5f5f7;--tx:#16161a;--mut:#6b6b76;--ac:#e5322d;--bd:#e2e2e8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c20;--tx:#f1f1f4;--mut:#9a9aa6;--bd:#2e2e35;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c20;--tx:#f1f1f4;--mut:#9a9aa6;--bd:#2e2e35;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:26px;margin:0}h1 span{color:var(--ac)}
+p.sub{color:var(--mut);margin:4px 0 20px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:200px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+button{padding:10px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+button:disabled{opacity:.5}
+.tabs{display:flex;gap:6px;margin-bottom:12px}.tabs button{flex:1}.tabs button.on{border-color:var(--ac);color:var(--ac)}
+.idea h3{margin:0 0 4px;font-size:17px}.idea p{margin:0 0 10px;color:var(--mut);font-size:14px}
+pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}
+.msg{color:var(--mut);font-size:14px;padding:8px 0}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Vynox <span>Studio</span></h1>
+<p class="sub">Ideas, scripts and titles for your channel. Straight to the point.</p>
+
+<div class="tabs"><button id="t1" class="on">Create</button><button id="t2">Saved</button></div>
+
+<section id="v1">
+<div class="card">
+<label for="topic">Topic or theme (optional)</label>
+<input id="topic" placeholder="e.g. cartoon facts, movie breakdowns, gaming">
+<div class="row">
+<div><label for="aud">Audience</label><select id="aud"><option>Kids and adults</option><option>Kids</option><option>Adults</option></select></div>
+<div><label for="fmt">Format</label><select id="fmt"><option>Short (under 60s)</option><option>Long (8 to 10 min)</option></select></div>
+</div>
+<div style="margin-top:12px"><button class="p" id="go">Get 5 video ideas</button></div>
+<div class="msg" id="st"></div>
+</div>
+<div id="ideas"></div>
+<div class="card hide" id="outc">
+<div class="row" style="margin-bottom:8px"><button id="cp">Copy</button><button id="sv">Save</button></div>
+<textarea id="out"></textarea>
+</div>
+</section>
+
+<section id="v2" class="hide"><div id="saved"></div></section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const VOICE="Channel: Vynox, entertainment, English, audience is male viewers in India. Voice: conversational like a friend giving real advice, yet an authority. To the point, no filler. Never exaggerate, overhype or act overly excited. Avoid em dashes.";
+let sample=null,cur=null,ideas=[];
+function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k)||"null")}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+function ctx(){return VOICE+" Audience: "+$("aud").value+". Format: "+$("fmt").value+". Topic: "+($("topic").value||"any entertainment topic that works well right now")+"."}
+async function init(){try{sample=await claude.use("sample")}catch(e){sample=null}
+ if(!sample)$("st").textContent="AI is not available in this view. Open the page from your Claude account to generate."}
+init();
+async function run(prompt,json){
+ if(!sample)throw new Error("AI unavailable");
+ return json?await sample.json(prompt):(await sample(prompt)).text}
+function busy(b,m){$("go").disabled=b;$("st").textContent=m||""}
+$("go").onclick=async()=>{
+ busy(true,"Thinking up ideas…");
+ try{
+  ideas=await run(ctx()+' Give 5 distinct video ideas. Return only JSON: [{"title":"","hook":""}] where hook is one plain sentence on why it works.',true);
+  render()
+ }catch(e){$("st").textContent="Could not generate. Try again."}
+ busy(false,$("st").textContent==="Thinking up ideas…"?"":$("st").textContent)};
+function render(){
+ const el=$("ideas");el.innerHTML="";
+ ideas.forEach((it,i)=>{
+  const d=document.createElement("div");d.className="card idea";
+  const h=document.createElement("h3");h.textContent=it.title;
+  const p=document.createElement("p");p.textContent=it.hook;
+  const r=document.createElement("div");r.className="row";
+  const b1=document.createElement("button");b1.textContent="Write script";
+  const b2=document.createElement("button");b2.textContent="Titles and tags";
+  b1.onclick=()=>make(it,"script",b1);b2.onclick=()=>make(it,"pack",b2);
+  r.append(b1,b2);d.append(h,p,r);el.append(d)})}
+async function make(it,kind,btn){
+ btn.disabled=true;$("st").textContent="Writing…";
+ const base=ctx()+" Video idea: "+it.title+". ";
+ const q=kind==="script"
+  ?base+"Write the full script. Start with a hook in the first 5 seconds. Mark sections clearly. Include a short, natural call to subscribe at the end. Plain text only."
+  :base+"Give 5 title options, one description (under 150 words), 12 tags, and 3 thumbnail text ideas of 3 words or fewer. Plain text only.";
+ try{const t=await run(q,false);cur={title:it.title,kind,text:t};$("out").value=t;$("outc").classList.remove("hide");$("outc").scrollIntoView({behavior:"smooth"});$("st").textContent=""}
+ catch(e){$("st").textContent="Could not generate. Try again."}
+ btn.disabled=false}
+$("cp").onclick=async()=>{try{await navigator.clipboard.writeText($("out").value);$("cp").textContent="Copied"}catch(e){$("out").select()}setTimeout(()=>$("cp").textContent="Copy",1500)};
+$("sv").onclick=()=>{if(!cur)return;const l=store("vynox")||[];l.unshift({...cur,text:$("out").value,at:Date.now()});store("vynox",l.slice(0,100));$("sv").textContent="Saved";setTimeout(()=>$("sv").textContent="Save",1500)};
+function tab(n){$("v1").classList.toggle("hide",n!==1);$("v2").classList.toggle("hide",n!==2);$("t1").classList.toggle("on",n===1);$("t2").classList.toggle("on",n===2);if(n===2)showSaved()}
+$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+function showSaved(){
+ const l=store("vynox")||[],el=$("saved");el.innerHTML="";
+ if(!l.length){el.innerHTML='<div class="msg">Nothing saved yet.</div>';return}
+ l.forEach((s,i)=>{
+  const d=document.createElement("div");d.className="card idea";
+  const h=document.createElement("h3");h.textContent=s.title;
+  const p=document.createElement("p");p.textContent=(s.kind==="script"?"Script":"Titles and tags")+" · "+new Date(s.at).toLocaleDateString();
+  const r=document.createElement("div");r.className="row";
+  const o=document.createElement("button");o.textContent="Open";
+  const x=document.createElement("button");x.textContent="Delete";
+  o.onclick=()=>{cur=s;$("out").value=s.text;$("outc").classList.remove("hide");tab(1);$("outc").scrollIntoView()};
+  x.onclick=()=>{l.splice(i,1);store("vynox",l);showSaved()};
+  r.append(o,x);d.append(h,p,r);el.append(d)})}
+</script>
+</body>
+</html>
